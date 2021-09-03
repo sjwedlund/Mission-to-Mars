@@ -14,6 +14,8 @@ def scrape_all():
     executable_path = {'executable_path': ChromeDriverManager().install()}
     browser = Browser('chrome', **executable_path, headless=True)
 
+    news_title, news_paragraph = mars_news(browser)
+
     # Run all scraping functions and store results in dictionary
     data = {
         "news_title": news_title,
@@ -105,5 +107,7 @@ if __name__ == "__main__":
 
 
 
+
+# %%
 
 # %%
