@@ -49,7 +49,7 @@ def mars_news(browser):
     try:
         slide_elem = news_soup.select_one('div.list_text')
         # Use the parent element to find the first 'a' tag and save it as a 'news_title'
-        slide_elem.find('div', class_='content_title').get_text()
+        news_title = slide_elem.find('div', class_='content_title').get_text()
         # Use the parent element to find the paragraph text
         news_p = slide_elem.find('div', class_='article_teaser_body').get_text()
         
@@ -103,7 +103,7 @@ def mars_facts():
     return df.to_html(classes="table table-striped")
 
 if __name__ == "__main__":
-    
+
     # If running as script, print scraped data
     print(scrape_all())
 
