@@ -7,6 +7,8 @@ from bs4 import BeautifulSoup as soup
 import pandas as pd 
 import datetime as dt
 from webdriver_manager.chrome import ChromeDriverManager
+import re
+from time import sleep 
 
 # In[2]:
 
@@ -17,6 +19,7 @@ def scrape_all():
     browser = Browser('chrome', **executable_path, headless=True)
 
     news_title, news_paragraph = mars_news(browser)
+    hemisphere = scrape_hemisphere_data(browser) 
     
     # Run all scraping functions and store results in dictionary
     data = {
@@ -25,7 +28,7 @@ def scrape_all():
         "featured_image": featured_image(browser),
         "facts": mars_facts(),
         "last_modified": dt.datetime.now(),
-        "hemisphere_image_info": hemisphere_image(browser)
+        "hemispheres": hemisphere(browser)
     }
 
     # Stop webdriver and return data
@@ -48,7 +51,7 @@ def mars_news(browser):
 
     # Add try/except for error handling
     try:
-        slide_elem = news_soup.select_one('div.list_text')
+        slide_elem = news_soup.select_one('ul.item_list li.slide')
         # Use the parent element to find the first 'a' tag and save it as a 'news_title'
         news_title = slide_elem.find('div', class_='content_title').get_text()
         # Use the parent element to find the paragraph text
@@ -59,7 +62,7 @@ def mars_news(browser):
 
     return news_title, news_p
 
-# ### Featured Images
+# Featured Images
 def featured_image(browser):
     # Visit URL
     url = 'https://spaceimages-mars.com' 
@@ -73,10 +76,14 @@ def featured_image(browser):
     html = browser.html
     img_soup = soup(html, 'html.parser')
 
+    # Parse the resulting html with soup
+    html = browser.html
+    img_soup = soup(html, 'html.parser')
+
     # Add try/except for error handling
     try:
         # Find the relative image url
-        img_url_rel = img_soup.find('img', class_='headerimage fade-in').get('src')
+        img_url_rel = img_soup.select_one('figure.lede a img').get("src")
 
     except AttributeError:
         return None
@@ -86,7 +93,7 @@ def featured_image(browser):
 
     return img_url
 
-
+# Mars Facts
 def mars_facts():
     # Add try/except for error handling
     try:
@@ -103,59 +110,51 @@ def mars_facts():
     # Convert dataframe into HTML format, add bootstrap
     return df.to_html(classes="table table-striped")
 
-def hemisphere_image(browser):
+def scrape_hemisphere_data(browser):
 
     # Visit the URL
     url = 'https://marshemispheres.com/'
     browser.visit(url)
+    sleep(2)
 
     # Create a list to hold the images and titles
     hemisphere_image_urls = []
 
-    # Code to retrieve the image urls and titles for each hemisphere
     # Parse the html with soup
     html = browser.html
-    main_page_soup = soup(html, 'html.parser')
+    urls_soup = soup(html, 'html.parser')
 
-    # Add try/except for error handling
-    try:
-        # Find the number of pictures to scan
-        pics_count = len(main_page_soup.select("div.item"))
+    # Code to retrieve the image urls and titles for each hemisphere
+    divs = urls_soup.find("div", class_='collapsible results')
+    anchors = divs.find_all('a')
+    relative_urls = set([anchor['href'] for anchor in anchors])
+    base_url = 'https://marshemispheres.com/'
 
-        # for loop over the links of each sample picture
-        for i in range (pics_count):
-            # Create an empty dictionary to hold the search results
-            results = {}
-            # Find the link to picture and open it
-            link_image = main_page_soup.select("div.description a")[i].get('href')
-            browser.visit(f'https://marshemispheres.com/{link_image}')
+    for relative_url in relative_urls:
+        print(f'Running {relative_url}')
+        hemispheres = []
 
-            # Parse the new html page with soup
-            html = browser.html
-            sample_image_soup = soup('html.parser')
-            # Get the full image link
-            img_url_rel = sample_image_soup.select_one("div.downloads ul li a").get('href')
-            # Get the full image title
-            img_title = sample_image_soup.select_one("h2.title").get_text()
-            
-            # Use the base URL to create an absolute URL
-            img_url = f'https://marshemispheres.com/{img_url_rel}'
-            
-            # Add extracts to the results dict
-            results = {
-                'img_url': img_url,
-                'title': img_title}
+        full_url = f'{base_url}{relative_url}'
+        browser.visit(full_url)
+        browser.links.find_by_text('Open').click()
 
-            # Append results dictionary to hemisphere image urls list
-            hemisphere_image_urls.append(results)
+        html = browser.html
+        urls_soup = soup(html, 'html.parser')
 
-            # Return to main page
-            browser.back()
+        downloads_div = urls_soup.find('div', class_='downloads')
+        img_anchor = downloads_div.find('a', text=re.compile('Sample'))
+        img_url = img_anchor['href']
+        # print(f'--> url: {image_url}')
 
-    except BaseException:
-        return None
+        title_elem = urls_soup.select_one('div.content')
+        title = title_elem.find("h2", class_='title').get_text()
+        # print(f'--> title: {title}')
+        hemispheres = {
+            'img_url': img_url,
+            'title': title,
+        }
+        hemisphere_image_urls.append(hemispheres)
 
-    # Return the list that holds the dictionary of each image url and title
     return hemisphere_image_urls
 
 if __name__ == "__main__":
